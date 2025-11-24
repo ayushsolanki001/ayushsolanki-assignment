@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UX Redesign Debugging Workflow</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .tabs {
+            display: flex;
+            background: #f7f7f7;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 18px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab:hover {
+            background: #efefef;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+            background: white;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .phase {
+            display: none;
+        }
+
+        .phase.active {
+            display: block;
+            animation: fadeIn 0.4s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .checkpoint {
+            background: #f9f9f9;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin-bottom: 16px;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .checkpoint:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transform: translateX(4px);
+        }
+
+        .checkpoint-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+        }
+
+        .checkpoint-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 600;
+            color: #333;
+            flex: 1;
+        }
+
+        .checkbox {
+            width: 24px;
+            height: 24px;
+            border: 2px solid #667eea;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+
+        .checkbox.checked {
+            background: #667eea;
+        }
+
+        .checkbox.checked::after {
+            content: '✓';
+            color: white;
+            font-weight: bold;
+        }
+
+        .checkpoint-details {
+            margin-top: 15px;
+            padding-left: 36px;
+            color: #666;
+            font-size: 14px;
+            line-height: 1.6;
+            display: none;
+        }
+
+        .checkpoint-details.expanded {
+            display: block;
+        }
+
+        .checkpoint-details ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        .checkpoint-details li {
+            margin: 6px 0;
+        }
+
+        .issue-tag {
+            display: inline-block;
+            padding: 4px 10px;
+            background: #ffe0e0;
+            color: #c62828;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+
+        .tip {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 12px 16px;
+            margin: 16px 0;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .tip strong {
+            color: #1976d2;
+        }
+
+        .progress-bar {
+            background: #e0e0e0;
+            height: 8px;
+            border-radius: 4px;
+            margin: 20px 0;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.5s;
+            border-radius: 4px;
+        }
+
+        .progress-text {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+
+        .expand-icon {
+            color: #667eea;
+            font-size: 18px;
+            transition: transform 0.3s;
+        }
+
+        .expand-icon.rotated {
+            transform: rotate(180deg);
+        }
+
+        .btn-reset {
+            background: #f44336;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 20px;
+            transition: all 0.3s;
+        }
+
+        .btn-reset:hover {
+            background: #d32f2f;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(244, 67, 54, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 UX Redesign Debugging Workflow</h1>
+            <p>Company Profile Page - RecruitCRM Assignment</p>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" data-phase="analysis">Phase 1: Analysis</div>
+            <div class="tab" data-phase="design">Phase 2: Design</div>
+            <div class="tab" data-phase="validation">Phase 3: Validation</div>
+            <div class="tab" data-phase="submission">Phase 4: Submission</div>
+        </div>
+
+        <div class="content">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressBar"></div>
+            </div>
+            <div class="progress-text" id="progressText">0% Complete</div>
+
+            <!-- Phase 1: Analysis -->
+            <div class="phase active" id="analysis">
+                <h2 style="margin-bottom: 20px; color: #333;">🔎 Current Product Analysis</h2>
+                
+                <div class="checkpoint">
+                    <div class="checkpoint-header">
+                        <div class="checkpoint-title">
+                            <div class="checkbox" data-id="c1"></div>
+                            <span>Account Setup & Product Access</span>
+                        </div>
+                        <span class="expand-icon">▼</span>
+                    </div>
+                    <div class="checkpoint-details">
+                        <ul>
+                            <li>Created account with correct naming format: [YourName] - RCRM Assignment (UX)</li>
+                            <li>Successfully accessed https://app.recruitcrm.io</li>
+                            <li>Navigated to Companies section via sidebar</li>
+                            <li>Opened at least 2-3 different company profiles for comparison</li>
+                        </ul>
+                        <div class="tip"><strong>💡 Debug Tip:</strong> If you can't access profiles, check if sample data loaded. Try adding a test company manually.</div>
+                    </div>
+                </div>
+
+                <div class="checkpoint">
+                    <div class="checkpoint-header">
+                        <div class="checkpoint-title">
+                            <div class="checkbox" data-id="c2"></div>
+                            <span>Information Layout Audit</span>
+                        </div>
+                        <span class="expand-icon">▼</span>
+                    </div>
+                    <div class="checkpoint-details">
+                        <ul>
+                            <li>Identified all information sections (header, details, contacts, jobs, candidates, activities)</li>
+                            <li>Noted visual hierarchy issues (what stands out vs. what gets buried)</li>
+                            <li>Checked for information density (too crowded or too sparse?)</li>
+                            <li>Documented which fields are most/least important for recruiters</li>
+                        </ul>
+                        <span class="issue-tag">Common Issue: Key info buried below fold</span>
+                        <div class="tip"><strong>🔧 Debug Check:</strong> Take screenshots and mark sections as "Critical," "Important," or "Secondary"</div>
+                    </div>
+                </div>
+
+                <div class="checkpoint">
+                    <div class="checkpoint-header">
+                        <div class="checkpoint-title">
+                            <div class="checkbox" data-id="c3"></div>
+                            <span>Navigation Flow Analysis</span>
+                        </div>
+                        <span class="expand-icon">▼</span>
+                    </div>
+                    <div class="checkpoint-details">
+                        <ul>
+                            <li>Tested switching between tabs (Contacts, Jobs, Activities, Candidates)</li>
+                            <li>Counted clicks needed to reach each section</li>
+                            <li>Checked if tab states are clearly indicated (active vs inactive)</li>
+                            <li>Verified if related actions are grouped logically</li>
+                        </ul>
+                        <span class="issue-tag">Common Issue: Tabs not persistent/visible</span>
+                        <div class="tip"><strong>🔧 Debug Check:</strong> Document the current tab pattern - is it horizontal, vertical, dropdown?</div>
+                    </div>
+                </div>
+
+                <div class="checkpoint">
+                    <div class="checkpoint-header">
+                        <div class="checkpoint-title">
+                            <div class="checkbox" data-id="c4"></div>
+                            <span>Task Flow Testing</span>
+                        </div>
+                        <span class="expand-icon">▼</span>
+                    </div>
+                    <div class="checkpoint-details">
+                        <ul>
+                            <li><strong>Log a Call:</strong> Count clicks, note where modal opens, check if context is preserved</li>
+                            <li><strong>Add a Job:</strong> Test discoverability of action button, form complexity</li>
+                            <li><strong>View Activity History:</strong> Check filtering options, scroll depth needed</li>
+                            <li><strong>Add/Edit Contact:</strong> Test inline editing vs modal, data persistence</li>
+                        </ul>
+                        <span class="issue-tag">Common Issue: 5+ clicks for frequent tasks</span>
+                        <div class="tip"><strong>🔧 Debug Check:</strong> Create a "click map" for each task - aim for 2-3 clicks max for daily tasks</div>
+                    </div>
+                </div>
+
+                <div class="checkpoint">
+                    <div class="checkpoint-header">
+                        <div class="checkpoint-title">
+                            <div class="checkbox" data-id="c5"></div>
+                            <span>UI Pattern Documentation</span>
+                        </div>
+                        <span class="expand-icon">▼</span>
+                    </div>
+                    <div class="checkpoint-details">
+                        <ul>
+                            <li>Documented button styles (primary, secondary, icon-only)</li>
+                            <li>Captured card patterns (shadows, borders, padding)</li>
+                            <li>Noted typography (sizes, weights, colors for headings/body/labels)</li>
+                            <li>Screenshot color palette (primary, secondary, text, backgrounds)</li>
+                            <li>Identified spacing patterns (margins, paddings, grid)</li>
+                        </ul>
+                        <div class="tip"><strong>💡 Debug Tip:</strong> Use browser dev tools to inspect exact colors, fonts, and spacing values</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Phase 2: Design -->
+            <div class="phase" id="design">
+                <h2 style="margin-bottom: 20px; color: #333;">✏️ Design & Wireframing</h2>
+
+                <div class="checkpoint">
+                    <div class="checkpoint-header">
+                        <div class="checkpoint-title">
+                            <div class="checkbox" data-id="c6"></div>
+                            <span>Design System Replication</span>
+                        </div>
+                        <span class="expand-icon">▼</span>
+                    </div>
+                    <div class="checkpoint-details">
+                        <ul>
+                            <li>Created Figma components for buttons matching existing styles</li>
+                            <li>Set up color styles from documented palette</li>
+                            <li>Configured text styles (H1, H2, Body, Label, etc.)</li>
+                            <li>Created card/container components with correct styling</li>
+                        </ul>
+                        <span class="issue-tag">Debug: Mismatched visual style breaks consistency</span>
+                        <div class="tip"><strong>🔧 Debug Check:</strong> Place screenshots next to your designs - do they look like the same product?</div>
+                    </div>
+                </div>
+
+                <div class="checkpoint">
+                    <div class="checkpoint-header">
+                        <div class="checkpoint-title">
+                            <div class="checkbox" data-id="c7"></div>
+                            <span>Information Architecture Redesign</span>
+                        </div>
+                        <span class="expand-icon">▼</span>
+                    </div>
+                    <div class="checkpoint-details">
+                        <ul>
+                            <li>Prioritized critical info in the header/top section</li>
+                            <li>Reduced visual clutter (combined similar fields, removed redundancy)</li>
+                            <li>Created clear visual hierarchy (size, weight, color, spacing)</li>
+                            <li>Grouped related information logically</li>
+                        </ul>
+                        <span class="issue-tag">Debug: Too much info causes cognitive overload</span>
+                        <div class="tip"><strong>🔧 Debug Check:</strong> Can you understand the page in 3 seconds? If not, simplify further.</div>
+                    </div>
+                </div>
+
+                <div class="checkpoint">
+                    <div class="checkpoint-header">
+                        <div class="checkpoint-title">
+                            <div class="checkbox" data-id="c8"></div>
+                            <span>Navigation Redesign</span>
+                        </div>
+                        <span class="expand-icon">▼</span>
+                    </div>
+                    <div class="checkpoint-details">
+                        <ul>
+                            <li>Made tabs/navigation always visible (no hidden menus for primary nav)</li>
+                            <li>Used clear active states for current section</li>
+                            <li>Ensured consistent positioning of navigation elements</li>
+                            <li>Added breadcrumbs or context indicators if needed</li>
+                        </ul>
+                        <span class="issue-tag">Debug: Users get lost between sections</span>
+                        <div class="tip"><strong>🔧 Debug Check:</strong> Test with someone unfamiliar - can they navigate without instructions?</div>
+                    </div>
+                </div>
+
+                <div class="checkpoint">
+                    <div class="checkpoint-header">
+                        <div class="checkpoint-title">
+                            <div class="checkbox" data-id="c9"></div>
+                            <span>Task Flow Optimization</span>
+                        </div>
+                        <span class="expand-icon">▼</span>
+                    </div>
+                    <div class="checkpoint-details">
+                        <ul>
+                            <li>Reduced clicks for "Log a Call" (target: 2 clicks max)</li>
+                            <li>Made "Add Job" button prominent and always accessible</li>
+                            <li>Simplified activity history viewing (inline vs separate page)</li>
+                            <li>Added quick actions for frequent tasks</li>
+                        </ul>
+                        <span class="issue-tag">Debug: Slow workflows frustrate daily users</span>
+                        <div class="tip"><strong>🔧 Debug Check:</strong> Count clicks in your redesign - aim for 30-50% reduction vs original</div>
+                    </div>
+                </div>
+
+                <div class="checkpoint">
+                    <div class="checkpoint-header">
+                        <div class="checkpoint-title">
+                            <div class="checkbox" data-id="c10"></div>
+                            <span>High-Fidelity Completeness</span>
+                        </div>
+                        <span class="expand-icon">▼</span>
+                    </div>
+                    <div class="checkpoint-details">
+                        <ul>
+                            <li>All screens/states designed (default, hover, active, empty states)</li>
+                            <li>Real content used (not Lorem ipsum for key fields)</li>
+                            <li>Consistent spacing and alignment throughout</li>
+                            <li>All interactive elements have clear visual affordances</li>
+                            <li>Responsive considerations noted (if applicable)</li>
+                        </ul>
+                        <span class="issue-tag">Debug: Incomplete designs leave questions</span>
+                        <div class="tip"><strong>🔧 Debug Check:</strong> Could a developer build this without asking questions?</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Phase 3: Validation -->
+            <div class="phase" id="validation">
+                <h2 style="margin-bottom: 20px; color: #333;">✅ Design Validation</h2>
+
+                <div class="checkpoint">
+                    <div class="checkpoint-header">
+                        <div class="checkpoint-title">
+                            <div class="checkbox" data-id="c11"></div>
+                            <span>Feature Parity Check</span>
+                        </div>
+                        <span class="expand-icon">▼</span>
+                    </div>
+                    <div class="checkpoint-details">
+                        <ul>
+                            <li>All original features present in redesign (no functionality removed)</li>
+                            <li>Company details section: all fields accounted for</li>
+                            <li>Contacts section: all actions available (add, edit, delete, view)</li>
+                            <li>Jobs section: posting, editing, status management preserved</li>
+                            <li>Activities: logging, viewing, filtering maintained</li>
+                            <li>Candidates: association and management features intact</li>
+                        </ul>
+                        <span class="issue-tag">Critical Debug: Missing features = incomplete solution</span>
+                        <div class="tip"><strong>🔧 Debug Check:</strong> Create a feature checklist from the original and mark each one in your redesign</div>
+                    </div>
+                </div>
+
+                <div class="checkpoint">
+                    <div class="checkpoint-header">
+                        <div class="checkpoint-title">
+                            <div class="checkbox" data-id="c12"></div>
+                            <span>Visual Consistency Audit</span>
+                        </div>
+                        <span class="expand-icon">▼</span>
+                    </div>
+                    <div class="checkpoint-details">
+                        <ul>
+                            <li>Button styles match existing patterns exactly</li>
+                            <li>Typography hierarchy follows current system</li>
+                            <li>Color usage aligns with brand (no new colors introduced)</li>
+                            <li>Spacing follows existing grid/rhythm</li>
+                            <li>Icons style matches current set</li>
+                        </ul>
+                        <span class="issue-tag">Debug: Style mismatch = failed constraint</span>
+                        <div class="tip"><strong>🔧 Debug Check:</strong> Overlay your design on original screenshots - blend or clash?</div>
+                    </div>
+                </div>
+
+                <div class="checkpoint">
+                    <div class="checkpoint-header">
+                        <div class="checkpoint-title">
+                            <div class="checkbox" data-id="c13"></div>
+                            <span>Usability Goals Check</span>
+                        </div>
+                        <span class="expand-icon">▼</span>
+                    </div>
+                    <div class="checkpoint-details">
+                        <ul>
+                            <li><strong>Scanability:</strong> Can key info be found in 5 seconds?</li>
+                            <li><strong>Navigation:</strong> Are sections reachable in 1-2 clicks?</li>
+                            <li><strong>Task efficiency:</strong> Are daily actions faster than before?</li>
+                            <li><strong>Clarity:</strong> Is the purpose of each element obvious?</li>
+                        </ul>
+                        <div class="tip"><strong>🔧 Debug Check:</strong> Do a quick "squint test" - even blurred, is hierarchy clear?</div>
+                    </div>
+                </div>
+
+                <div class="checkpoint">
+                    <div class="checkpoint-header">
+                        <div class="checkpoint-title">
+                            <div class="checkbox" data-id="c14"></div>
+                            <span>Rationale Document Quality</span>
+                        </div>
+                        <span class="expand-icon">▼</span>
+                    </div>
+                    <div class="checkpoint-details">
+                        <ul>
+                            <li><strong>Pain Points:</strong> Clearly listed with specific examples</li>
+                            <li><strong>Changes Made:</strong> Each major change documented with reasoning</li>
+                            <li><strong>Impact:</strong> Explained how changes improve recruiter workflow</li>
+                            <li><strong>Before/After:</strong> Side-by-side comparisons where helpful</li>
+                            <li><strong>Metrics:</strong> Quantified improvements (e.g., "Reduced from 5 to 2 clicks")</li>
+                        </ul>
+                        <span class="issue-tag">Debug: Weak rationale undermines design decisions</span>
+                        <div class="tip"><strong>🔧 Debug Check:</strong> Keep it concise - aim for 1-2 pages max, clear structure</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Phase 4: Submission -->
+            <div class="phase" id="submission">
+                <h2 style="margin-bottom: 20px; color: #333;">🚀 Submission Checklist</h2>
+
+                <div class="checkpoint">
+                    <div class="checkpoint-header">
+                        <div class="checkpoint-title">
+                            <div class="checkbox" data-id="c15"></div>
+                            <span>Figma File Preparation</span>
+                        </div>
+                        <span class="expand-icon">▼</span>
+                    </div>
+                    <div class="checkpoint-details">
+                        <ul>
+                            <li>File sharing settings set to "Anyone with link can view"</li>
+                            <li>All frames properly named and organized</li>
+                            <li>Design includes clear labels/annotations for key changes</li>
+                            <li>Link tested in incognito window to verify access</li>
+                            <li>Optional: Added prototype flows for key interactions</li>
+                        </ul>
+                        <span class="issue-tag">Critical Debug: Inaccessible link = no review</span>
+                        <div class="tip"><strong>🔧 Debug Check:</strong> Have someone else test your link before submitting</div>
+                    </div>
+                </div>
+
+                <div class="checkpoint">
+                    <div class="checkpoint-header">
+                        <div class="checkpoint-title">
+                            <div class="checkbox" data-id="c16"></div>
+                            <span>Document Formatting</span>
+                        </div>
+                        <span class="expand-icon">▼</span>
+                    </div>
+                    <div class="checkpoint-details">
+                        <ul>
+                            <li>Clear structure: Pain Points → Changes → Impact</li>
+                            <li>Professional formatting (headings, bullets, white space)</li>
+                            <li>Screenshots/visuals included where helpful</li>
+                            <li>Proofread for typos and clarity</li>
+                            <li>File saved as PDF or shareable link (Google Docs/Notion)</li>
+                        </ul>
+                        <div class="tip"><strong>💡 Debug Tip:</strong> Read it aloud - if it sounds confusing, rewrite for clarity</div>
+                    </div>
+                </div>
+
+                <div class="checkpoint">
+                    <div class="checkpoint-header">
+                        <div class="checkpoint-title">
+                            <div class="checkbox" data-id="c17"></div>
+                            <span>Final Quality Check</span>
+                        </div>
+                        <span class="expand-icon">▼</span>
+                    </div>
+                    <div class="checkpoint-details">
+                        <ul>
+                            <li>Wireframes are HIGH-FIDELITY (not sketches or lo-fi)</li>
+                            <li>All assignment requirements addressed</li>
+                            <li>No placeholder text in critical areas</li>
+                            <li>Design aligns with existing brand/UI patterns</li>
+                            <li>Rationale explains WHY, not just WHAT</li>
+                        </ul>
+                        <span class="issue-tag">Debug: Low quality = missed opportunity</span>
+                        <div class="tip"><strong>🔧 Debug Check:</strong> Sleep on it, review fresh the next day</div>
+                    </div>
+                </div>
+
+                <div class="checkpoint">
+                    <div class="checkpoint-header">
+                        <div class="checkpoint-title">
+                            <div class="checkbox" data-id="c18"></div>
+                            <span>Submission Form Completion</span>
+                        </div>
+                        <span class="expand-icon">▼</span>
+                    </div>
+                    <div class="checkpoint-details">
+                        <ul>
+                            <li>Accessed submission form: https://forms.gle/xJfSTuF5RYxqKAtw6</li>
+                            <li>Figma link copied and pasted correctly</li>
+                            <li>Design rationale document attached/linked</li>
+                            <li>Contact information accurate</li>
+                            <li>Double-checked all fields before submitting</li>
+                        </ul>
+                        <div class="tip"><strong>💡 Final Tip:</strong> Screenshot your submission confirmation for your records</div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn-reset" id="resetBtn">🔄 Reset All Progress</button>
+        </div>
+    </div>
+
+    <script>
+        const checkboxes = {};
+        const totalCheckpoints = 18;
+
+        document.querySelectorAll('.checkbox').forEach(box => {
+            const id = box.getAttribute('data-id');
+            checkboxes[id] = false;
+            
+            const saved = localStorage.getItem(id);
+            if (saved === 'true') {
+                checkboxes[id] = true;
+                box.classList.add('checked');
+            }
+
+            box.addEventListener('click', (e) => {
+                e.stopPropagation();
+                checkboxes[id] = !checkboxes[id];
+                box.classList.toggle('checked');
+                localStorage.setItem(id, checkboxes[id]);
+                updateProgress();
+            });
+        });
+
+        document.querySelectorAll('.checkpoint-header').forEach(header => {
+            header.addEventListener('click', () => {
+                const details = header.nextElementSibling;
+                const icon = header.querySelector('.expand-icon');
+                details.classList.toggle('expanded');
+                icon.classList.toggle('rotated');
+            });
+        });
+
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const targetPhase = tab.getAttribute('data-phase');
+                
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.phase').forEach(p => p.classList.remove('active'));
+                
+                tab.classList.add('active');
+                document.getElementById(targetPhase).classList.add('active');
+            });
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            if (confirm('Are you sure you want to reset all progress? This cannot be undone.')) {
+                Object.keys(checkboxes).forEach(id => {
+                    checkboxes[id] = false;
+                    localStorage.removeItem(id);
+                    const box = document.querySelector(`[data-id="${id}"]`);
+                    if (box) box.classList.remove('checked');
+                });
+                updateProgress();
+            }
+        });
+
+        function updateProgress() {
+            const completed = Object.values(checkboxes).filter(v => v).length;
+            const percentage = Math.round((completed / totalCheckpoints) * 100);
+            
+            document.getElementById('progressBar').style.width = percentage + '%';
+            document.getElementById('progressText').textContent = `${percentage}% Complete (${completed}/${totalCheckpoints})`;
+        }
+
+        updateProgress();
+    </script>
+</body>
+</html>
